@@ -13,7 +13,8 @@ from inverse_rl.utils.hyper_sweep import run_sweep_parallel, run_sweep_serial
 from tensorflow.python import debug as tf_debug
 
 
-def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, debug=False, n_val=1, n_rew=1, max_nstep=1, exp_folder=None, state_only=False, score_discrim=True):
+def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, debug=False, n_val=1, n_rew=1, \
+         max_nstep=1, exp_folder=None, state_only=False, score_discrim=True, score_method=None):
     env = TfEnv(CustomGymEnv('PointMazeRight-v0', record_video=False, record_log=False))
 
     gpu_options = tf.GPUOptions(allow_growth=True,visible_device_list=visible_gpus)
@@ -29,7 +30,7 @@ def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, debug=Fal
 
     max_path_length=500
     irl_model = AIRL_Bootstrap(discount=discount, env=env, expert_trajs=experts, state_only=state_only, fusion=fusion, max_itrs=10, score_discrim=score_discrim, debug = debug, \
-                               max_nstep = max_nstep, n_value_funct = n_val, n_rew_funct = n_rew)
+                               max_nstep = max_nstep, n_value_funct = n_val, n_rew_funct = n_rew, score_method=score_method)
 
     policy = GaussianMLPPolicy(name='policy', env_spec=env.spec, hidden_sizes=(32, 32))
     algo = IRLTRPO(
@@ -63,6 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_rew', type=int, default=1)
     parser.add_argument('--max_nstep', type=int, default=1)
     parser.add_argument('--exp_folder', type=str) 
+    parser.add_argument('--score_method', type=str, default="average_rewards")
     parser.add_argument('--state_only', action="store_true")
     parser.add_argument('--score_discrim', action="store_true")    
 
@@ -76,11 +78,12 @@ if __name__ == "__main__":
         'n_rew' : [args.n_rew],
         'max_nstep' : [args.max_nstep],
         'state_only': [args.state_only],
-        'score_discrim': [args.score_discrim]        
+        'score_discrim': [args.score_discrim],
+        'score_method': [args.score_method]        
     }
     if args.debug == True:
         main(fusion=True, debug=args.debug, visible_gpus=args.visible_gpus, \
              n_val=args.n_val, n_rew=args.n_rew, max_nstep=args.max_nstep, exp_folder=args.exp_folder, \
-             state_only=args.state_only, score_discrim=args.score_discrim)
+             state_only=args.state_only, score_discrim=args.score_discrim, score_method=args.score_method)
     else:
-        run_sweep_parallel(main, params_dict, repeat=3)    
+        run_sweep_parallel(main, params_dict, repeat=1)    

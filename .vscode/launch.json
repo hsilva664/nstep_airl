@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             // "program": "${workspaceFolder}/airl_state_scripts/maze_right_irl.py",
-            "program": "${workspaceFolder}/airl_gae_scripts/maze_right_irl_bootstrap_temp.py",
+            "program": "${workspaceFolder}/airl_gae_scripts/half_cheetah_irl_bootstrap.py",
             "console": "integratedTerminal",
             "args": [ "--exp_folder", "Debug", "--score_method", "teacher_student", "--debug" ]
         },

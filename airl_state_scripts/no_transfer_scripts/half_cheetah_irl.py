@@ -14,7 +14,8 @@ from inverse_rl.utils.log_utils import rllab_logdir, load_latest_experts
 from inverse_rl.utils.hyper_sweep import run_sweep_parallel, run_sweep_serial
 
 
-def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99):
+def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, \
+         debug=False, exp_folder=None, state_only=False, score_discrim=True):
     env = TfEnv(GymEnv('HalfCheetah-v3', record_video=False, record_log=False))
 
     gpu_options = tf.GPUOptions(allow_growth=True,visible_device_list=args.visible_gpus)
@@ -22,7 +23,9 @@ def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99):
 
     experts = load_latest_experts('data/half_cheetah', n=5, visible_gpus=visible_gpus)
 
-    irl_model = AIRL(discount=discount, env=env, expert_trajs=experts, state_only=True, fusion=args.fusion, max_itrs=10)
+    irl_model = AIRL(discount=discount, env=env, expert_trajs=experts, \
+                     state_only=state_only, fusion=args.fusion, max_itrs=10, \
+                     score_discrim=score_discrim)
     policy = GaussianMLPPolicy(name='policy', env_spec=env.spec, hidden_sizes=(32, 32))
     algo = IRLTRPO(
         env=env,
@@ -40,7 +43,8 @@ def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99):
         baseline=LinearFeatureBaseline(env_spec=env.spec)
     )
 
-    with rllab_logdir(algo=algo, dirname='data/half_cheetah_airl_state_only'):
+    dirname = 'data/half_cheetah_airl/%s/%s'%(exp_folder, exp_name) if exp_folder is not None else 'data/half_cheetah_airl/%s'%(exp_name)
+    with rllab_logdir(algo=algo, dirname=dirname):
         with tf.Session(config=tf_config) as sess:
             algo.train(sess)
 
@@ -49,9 +53,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--visible_gpus', type=str, default='0')
     parser.add_argument('--fusion', action='store_false')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--exp_folder', type=str)
+    parser.add_argument('--state_only', action="store_true")
+    parser.add_argument('--score_discrim', action="store_true")    
+
     args = parser.parse_args()
     params_dict = {
         'fusion': [args.fusion],
-        'visible_gpus': [args.visible_gpus]
+        'visible_gpus': [args.visible_gpus],
+        'exp_folder': [args.exp_folder],
+        'debug' : [args.debug],
+        'state_only': [args.state_only],
+        'score_discrim': [args.score_discrim],
     }
-    run_sweep_parallel(main, params_dict, repeat=2)
+
+    if args.debug == True:
+        main(fusion=args.fusion, debug=args.debug, visible_gpus=args.visible_gpus, \
+             exp_folder=args.exp_folder, state_only=args.state_only, \
+             score_discrim=args.score_discrim)
+    else:
+        run_sweep_parallel(main, params_dict, repeat=2)

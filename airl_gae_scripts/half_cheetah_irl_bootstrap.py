@@ -7,7 +7,7 @@ from rllab.envs.gym_env import GymEnv
 
 from inverse_rl.envs.env_utils import CustomGymEnv
 from inverse_rl.algos.irl_trpo import IRLTRPO
-from inverse_rl.models.airl_bootstrap_temp import *
+from inverse_rl.models.airl_bootstrap import *
 from inverse_rl.utils.log_utils import rllab_logdir, load_latest_experts, load_latest_experts_multiple_runs
 from inverse_rl.utils.hyper_sweep import run_sweep_parallel, run_sweep_serial
 from tensorflow.python import debug as tf_debug
@@ -15,22 +15,25 @@ from tensorflow.python import debug as tf_debug
 
 def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, debug=False, n_val=1, n_rew=1, \
          max_nstep=1, exp_folder=None, state_only=False, score_discrim=True, score_method=None):
-    env = TfEnv(CustomGymEnv('PointMazeRight-v0', record_video=False, record_log=False))
+    env = TfEnv(GymEnv('HalfCheetah-v3', record_video=False, record_log=False))
 
     gpu_options = tf.GPUOptions(allow_growth=True,visible_device_list=visible_gpus)
     tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1, gpu_options=gpu_options)
 
 
-    # load ~2 iterations worth of data from each forward RL experiment as demos
-    experts = load_latest_experts_multiple_runs('data/maze_right_data_collect', n=2, visible_gpus=visible_gpus)
+    # load ~5 iterations worth of data from each forward RL experiment as demos
+    experts = load_latest_experts('data/half_cheetah', n=5, visible_gpus=visible_gpus)
 
     sess = tf.Session(config=tf_config)
 
     # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
     max_path_length=500
-    irl_model = AIRL_Bootstrap_temp(discount=discount, env=env, expert_trajs=experts, state_only=state_only, fusion=fusion, max_itrs=10, score_discrim=score_discrim, debug = debug, \
-                               max_nstep = max_nstep, n_value_funct = n_val, n_rew_funct = n_rew, score_method=score_method)
+    irl_model = AIRL_Bootstrap(discount=discount, env=env, expert_trajs=experts, \
+                               state_only=state_only, fusion=fusion, max_itrs=10, \
+                               score_discrim=score_discrim, debug = debug, \
+                               max_nstep = max_nstep, n_value_funct = n_val, \
+                               n_rew_funct = n_rew, score_method=score_method)
 
     policy = GaussianMLPPolicy(name='policy', env_spec=env.spec, hidden_sizes=(32, 32))
     algo = IRLTRPO(
@@ -46,10 +49,11 @@ def main(exp_name=None, fusion=False, visible_gpus='0', discount=0.99, debug=Fal
         entropy_weight=0.1,
         zero_environment_reward=True,
         baseline=LinearFeatureBaseline(env_spec=env.spec),
+        discrim_train_itrs=50
     )
 
     # temp_folder = '/media/data/temp_exp_nstep/maze_right_state_bootstrap_%d_irl/%s'
-    dirname = 'data/maze_right_state_bootstrap_%d_irl/%s/%s'%(max_nstep, exp_folder, exp_name) if exp_folder is not None else 'data/maze_right_state_bootstrap_%d_irl/%s'%(max_nstep, exp_name)
+    dirname = 'data/half_cheetah_bootstrap_%d_irl/%s/%s'%(max_nstep, exp_folder, exp_name) if exp_folder is not None else 'data/half_cheetah_bootstrap_%d_irl/%s'%(max_nstep, exp_name)
     with rllab_logdir(algo=algo, dirname=dirname ):
         sess.__enter__()
         algo.train(sess)
